@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  rds-postgres-local:
+    image: postgres:15-alpine
+    container_name: sizacloud-rds-local
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: sizacloud
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: localdevpassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./backend/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d sizacloud"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  sizacloud-flask-api:
+    build: ./backend
+    container_name: sizacloud-ec2-local
+    restart: unless-stopped
+    environment:
+      AWS_DEFAULT_REGION: af-south-1
+      RDS_HOSTNAME: rds-postgres-local
+      RDS_DB_NAME: sizacloud
+      RDS_USERNAME: postgres
+      RDS_PASSWORD: localdevpassword
+      S3_AUDIT_BUCKET: sizacloud-doh-audit-logs-af-south-1
+    ports:
+      - "8000:8000"
+    depends_on:
+      rds-postgres-local:
+        condition: service_healthy
+
+volumes:
+  pgdata:
